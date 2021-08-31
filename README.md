@@ -1,4 +1,4 @@
-# Controlled Schrödinger-FollMer Drift
+# Controlled Schrödinger-Follmer Drift
 
 Controlled Follmer Drift Implementation for Blackbox Approximate Bayesian Inference
 
