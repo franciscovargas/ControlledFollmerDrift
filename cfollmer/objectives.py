@@ -57,9 +57,7 @@ def relative_entropy_control_cost_direct(sde, Θ_0, ln_prior, Δt=0.05, γ=1.0, 
     """
     n = int(1.0 / Δt)
     ts = torch.linspace(0, 1, n).to(device)
-    
-    ln_like_partial = lambda Θ: ln_like(Θ, X, y)
-    
+        
     Θs =  torchsde.sdeint(sde, Θ_0, ts, method="euler",dt=Δt)
     μs = sde.f(ts, Θs)
     ΘT = Θs[-1] 
