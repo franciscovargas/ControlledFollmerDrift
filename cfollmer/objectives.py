@@ -48,7 +48,7 @@ def relative_entropy_control_cost(sde, Θ_0, X, y, ln_prior, ln_like, Δt=0.05, 
     lng = log_g(ΘT, ln_prior, ln_like_partial, γ)
     girsanov_factor = (0.5 / γ) * ((μs**2).sum(axis=-1)).sum(axis=0) * Δt
     
-    return (girsanov_factor - lng).mean()
+    return (girsanov_factor  - lng).mean()
 
 
 def relative_entropy_control_cost_direct(sde, Θ_0, ln_prior, Δt=0.05, γ=1.0, device="cpu"):

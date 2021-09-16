@@ -11,8 +11,11 @@ class SimpleForwardNet(torch.nn.Module):
         self.nn = torch.nn.Sequential(
             torch.nn.Linear(input_dim + 1, width), torch.nn.ReLU(),
             torch.nn.Linear(width, width), torch.nn.ReLU(),
+            torch.nn.Linear(width, width), torch.nn.ReLU(),
             torch.nn.Linear(width, input_dim )
         )
+        
+        self.nn[-1].weight.data.fill_(0.0)
         
 
     def forward(self, x):
