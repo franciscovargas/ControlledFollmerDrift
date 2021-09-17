@@ -12,6 +12,7 @@ class SimpleForwardNet(torch.nn.Module):
             torch.nn.Linear(input_dim + 1, width), torch.nn.ReLU(),
             torch.nn.Linear(width, width), torch.nn.ReLU(),
             torch.nn.Linear(width, width), torch.nn.ReLU(),
+            torch.nn.Linear(width, width), torch.nn.ReLU(),
             torch.nn.Linear(width, input_dim )
         )
         
