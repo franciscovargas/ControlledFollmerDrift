@@ -22,6 +22,27 @@ class SimpleForwardNet(torch.nn.Module):
     def forward(self, x):
         return self.nn(x)
 
+    
+class SimpleForwardNetBN(torch.nn.Module):
+
+    def __init__(self, input_dim=1):
+        super(SimpleForwardNet, self).__init__()
+        
+        width = 20
+        self.nn = torch.nn.Sequential(
+            torch.nn.Linear(input_dim + 1, width), torch.nn.BatchNorm1d(width, affine=False), torch.nn.ReLU(),
+            torch.nn.Linear(width, width), torch.nn.BatchNorm1d(width, affine=False), torch.nn.ReLU(),
+            torch.nn.Linear(width, width), torch.nn.BatchNorm1d(width, affine=False), torch.nn.ReLU(),
+            torch.nn.Linear(width, width), torch.nn.BatchNorm1d(width, affine=False), torch.nn.ReLU(),
+            torch.nn.Linear(width, input_dim )
+        )
+        
+        self.nn[-1].weight.data.fill_(0.0)
+        
+
+    def forward(self, x):
+        return self.nn(x)
+
 
 class FollmerSDE(torch.nn.Module):
 

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 import numpy as np
 
-
+from torch import _vmap_internals
 
 def log_g(Θ, ln_prior, ln_like, γ=1.0):
     """
@@ -33,7 +33,11 @@ def log_g_direct(Θ, ln_prior, ln_like, γ=1.0):
 
 
 
-def relative_entropy_control_cost(sde, Θ_0, X, y, ln_prior, ln_like, Δt=0.05, γ=1.0, device="cpu"):
+def relative_entropy_control_cost(
+        sde, Θ_0, X, y, ln_prior,
+        ln_like, Δt=0.05, γ=1.0,
+        device="cpu", batchnorm=False
+    ):
     """
     Objective for the Hamilton-Bellman-Jacobi Follmer Sampler
     """
@@ -43,7 +47,14 @@ def relative_entropy_control_cost(sde, Θ_0, X, y, ln_prior, ln_like, Δt=0.05, 
     ln_like_partial = lambda Θ: ln_like(Θ, X, y)
     
     Θs =  torchsde.sdeint(sde, Θ_0, ts, method="euler",dt=Δt)
-    μs = sde.f(ts, Θs)
+    if not batchnorm:
+        μs = sde.f(ts, Θs)
+    else:
+        def f_(t, x):
+            return sde.f(t, x)
+        f = _vmap_internals.vmap(f_) 
+        μs = f(ts, Θs)
+        
     ΘT = Θs[-1] 
     lng = log_g(ΘT, ln_prior, ln_like_partial, γ)
     girsanov_factor = (0.5 / γ) * ((μs**2).sum(axis=-1)).sum(axis=0) * Δt
