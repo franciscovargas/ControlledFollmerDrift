@@ -47,6 +47,7 @@ def relative_entropy_control_cost(
     ln_like_partial = lambda Θ: ln_like(Θ, X, y)
     
     Θs =  torchsde.sdeint(sde, Θ_0, ts, method="euler",dt=Δt)
+
     if not batchnorm:
         μs = sde.f(ts, Θs)
     else:
