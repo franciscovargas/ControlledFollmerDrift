@@ -19,7 +19,7 @@ def basic_batched_trainer(
     Θ_0 = torch.zeros((batch_size_Θ, dim)).to(device) 
     
     sde = FollmerSDE(dim, dim, batch_size_Θ  , γ=γ, device=device).to(device)
-    optimizer = torch.optim.Adam(sde.μ.parameters(), lr=lr, weight_decay =0.5)
+    optimizer = torch.optim.Adam(sde.μ.parameters(), lr=lr, weight_decay=0.5)
     #     optimizer = torch.optim.LBFGS(gpr.parameters(), lr=0.01)
     losses = []
     # with torch.autograd.set_detect_anomaly(True):
@@ -32,7 +32,7 @@ def basic_batched_trainer(
             sde, Θ_0.float(),
             X_train.float(), y_train.float(),
             ln_prior, log_likelihood_vmap, γ=γ,
-            batchnorm=True, device=device
+            batchnorm=batchnorm, device=device,adjoint=adjoint
         )
 
         if isinstance(optimizer, torch.optim.LBFGS):
