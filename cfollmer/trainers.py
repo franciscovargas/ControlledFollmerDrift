@@ -13,10 +13,6 @@ def basic_batched_trainer(
         batchnorm=True, device="cpu"
     ):
 
-
-    adjoint = False
-    stl = True
-
     t_size = int(math.ceil(1.0/Δt))
     ts = torch.linspace(0, 1, t_size).to(device)
     
