@@ -1,5 +1,13 @@
 import torch
+from collections import OrderedDict
 
+
+def detach_state_dict(state_dict):
+    d = OrderedDict()
+    
+    for k,v in state_dict.items():
+        d[k] = v.detach()
+    return v
 
 
 class SimpleForwardNet(torch.nn.Module):
@@ -61,6 +69,8 @@ class FollmerSDE(torch.nn.Module):
 
         self.γ = γ
         self.μ = SimpleForwardNet(input_dim=state_size).to(device)
+        
+        self.μ_detached = SimpleForwardNet(input_dim=state_size).to(device)
 
     # Drift
     def f(self, t, y):
@@ -72,6 +82,16 @@ class FollmerSDE(torch.nn.Module):
         y = torch.cat((y, t_), dim=-1)
 
         return self.μ(y)   # shape (batch_size, state_size)
+    
+    def f_detached(self, t, y):
+        # For STL estimator
+   
+        d = y.shape[0] if len(y.shape) == 2 else y.shape[1]
+        t_ = t.to(self.device) * torch.ones(d,1).to(self.device)
+        t_ = t_ if len(y.shape) == 2 else t_.T[...,None]
+        y = torch.cat((y, t_), dim=-1)
+
+        return self.μ_detached(y)  
 
     # Diffusion
     def g(self, t, y):
