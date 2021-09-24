@@ -35,15 +35,17 @@ def basic_batched_trainer(
 
     for i in tqdm(range(num_steps)):
         optimizer.zero_grad()
+        
+        loss_call = lambda: loss_(
+            sde, Θ_0.float(),
+            X_train.float(), y_train.float(),
+            ln_prior, log_likelihood_vmap, γ=γ,
+            batchnorm=True, device=device
+        )
 
         if isinstance(optimizer, torch.optim.LBFGS):
             def closure():
-                loss = loss_(
-                    sde, Θ_0.float(),
-                    X_train.float(), y_train.float(),
-                    ln_prior, log_likelihood_vmap, γ=γ,
-                    batchnorm=True, device=device
-                )
+                loss = loss_call()
                 optimizer.zero_grad()
                 loss.backward()
                 return loss
@@ -51,12 +53,7 @@ def basic_batched_trainer(
             optimizer.step(closure)
             losses.append(closure().item())
         else:
-            loss = loss_(
-                sde, Θ_0,
-                X_train, y_train,
-                ln_prior, log_likelihood_vmap, γ=γ,
-                batchnorm=False, device=device
-            )
+            loss = loss_call()
             optimizer.zero_grad()
             loss.backward()
 
