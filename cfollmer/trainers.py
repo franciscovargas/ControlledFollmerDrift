@@ -12,11 +12,8 @@ def basic_batched_trainer(
         num_steps=200, batch_size_data=None, batch_size_Θ=200, lr=0.001,
         batchnorm=True, device="cpu"
     ):
-    γ = 0.5
-    Δt = 0.01
 
-    # γ = 1
-    # Δt = 0.05 - \sigma_w = 10-6
+
     adjoint = False
     stl = True
 
