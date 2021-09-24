@@ -38,7 +38,7 @@ def log_g_direct(Θ, ln_prior, ln_like, γ=1.0):
 def relative_entropy_control_cost(
         sde, Θ_0, X, y, ln_prior,
         ln_like, Δt=0.05, γ=1.0,
-        device="cpu", batchnorm=False
+        device="cpu", batchnorm=False, method="euler", adjoint=False
     ):
     """
     Objective for the Hamilton-Bellman-Jacobi Follmer Sampler
@@ -48,7 +48,10 @@ def relative_entropy_control_cost(
     
     ln_like_partial = lambda Θ: ln_like(Θ, X, y)
     
-    Θs =  torchsde.sdeint(sde, Θ_0, ts, method="euler",dt=Δt)
+    if not adjoint:
+        Θs =  torchsde.sdeint(sde, Θ_0, ts, method=method,dt=Δt)
+    else:
+        Θs =  torchsde.sdeint_adjoint(sde, Θ_0, ts, method=method,dt=Δt)
 
     if not batchnorm:
         μs = sde.f(ts, Θs)
@@ -68,7 +71,7 @@ def relative_entropy_control_cost(
 def stl_relative_entropy_control_cost(
         sde, Θ_0, X, y, ln_prior,
         ln_like, Δt=0.05, γ=1.0,
-        device="cpu", batchnorm=False
+        device="cpu", batchnorm=False, method="euler", adjoint=False
     ):
     """
     Stick the landing objective (Xu et al. 2021) for the
@@ -79,9 +82,11 @@ def stl_relative_entropy_control_cost(
     
     ln_like_partial = lambda Θ: ln_like(Θ, X, y)
     
-    Θs =  torchsde.sdeint(sde, Θ_0, ts, method="euler",dt=Δt)
+    if not adjoint:
+        Θs =  torchsde.sdeint(sde, Θ_0, ts, method=method,dt=Δt)
+    else:
+        Θs =  torchsde.sdeint_adjoint(sde, Θ_0, ts, method=method,dt=Δt)
     
-    sde.μ_detached.load_state_dict((sde.μ.state_dict()))
     if not batchnorm:
         μs = sde.f(ts, Θs)
         μs_detached = sde.f_detached(ts, Θs)
