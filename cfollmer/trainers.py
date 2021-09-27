@@ -10,7 +10,7 @@ def basic_batched_trainer(
         γ, Δt, ln_prior, log_likelihood_vmap, dim, X_train, y_train,
         method="euler", stl=True, adjoint=False, optimizer=None,
         num_steps=200, batch_size_data=None, batch_size_Θ=200, lr=0.001,
-        batchnorm=True, device="cpu"
+        batchnorm=True, device="cpu", batch_size = None
     ):
 
     t_size = int(math.ceil(1.0/Δt))
@@ -22,35 +22,51 @@ def basic_batched_trainer(
     optimizer = torch.optim.Adam(sde.μ.parameters(), lr=lr, weight_decay=0.5)
     #     optimizer = torch.optim.LBFGS(gpr.parameters(), lr=0.01)
     losses = []
-    # with torch.autograd.set_detect_anomaly(True):
+    
+    avg_loss_list = []
+    batch_size = len(X_train) if batch_size is None else batch_size
+    n_batches = int(len(X_train) / batch_size) 
+    
+    
     loss_ = stl_relative_entropy_control_cost if stl else relative_entropy_control_cost
 
     for i in tqdm(range(num_steps)):
-        optimizer.zero_grad()
         
-        loss_call = lambda: loss_(
-            sde, Θ_0.float(),
-            X_train.float(), y_train.float(),
-            ln_prior, log_likelihood_vmap, γ=γ,
-            batchnorm=batchnorm, device=device,adjoint=adjoint
-        )
+        # shuffle train (refresh):
+        perm = torch.randperm(len(X_train))
+        
+        # stochastic minibatch GD (MC estimate of gradient via subsample)
+        for batch in range(n_batches): # Make sure to go through whole dtaset
+            batch_X = X_train[perm,...][batch*batch_size:(batch+1)*batch_size,]
+            batch_y = y_train[perm,...][batch*batch_size:(batch+1)*batch_size,]
+            
+            optimizer.zero_grad()
 
-        if isinstance(optimizer, torch.optim.LBFGS):
-            def closure():
+            loss_call = lambda: loss_(
+                sde, Θ_0.float(),
+                batch_X.float(), batch_y.float(),
+                ln_prior, log_likelihood_vmap, γ=γ,
+                batchnorm=batchnorm, device=device,adjoint=adjoint
+            )
+
+            if isinstance(optimizer, torch.optim.LBFGS):
+                def closure():
+                    loss = loss_call()
+                    optimizer.zero_grad()
+                    loss.backward()
+                    return loss
+
+                optimizer.step(closure)
+                avg_loss_list.append(closure().item())
+            else:
                 loss = loss_call()
                 optimizer.zero_grad()
                 loss.backward()
-                return loss
 
-            optimizer.step(closure)
-            losses.append(closure().item())
-        else:
-            loss = loss_call()
-            optimizer.zero_grad()
-            loss.backward()
-
-            optimizer.step()       
-            losses.append(loss.item())
-        if stl:
-            sde.μ_detached.load_state_dict((sde.μ.state_dict()))
+                optimizer.step()       
+                avg_loss_list.append(loss.item())
+            if stl:
+                sde.μ_detached.load_state_dict((sde.μ.state_dict()))
+        loss_list.append(torch.mean(avg_loss_list))
+        avg_loss_list = []
     return sde, losses
