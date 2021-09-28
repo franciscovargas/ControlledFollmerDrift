@@ -10,7 +10,7 @@ def basic_batched_trainer(
         γ, Δt, ln_prior, log_likelihood_vmap, dim, X_train, y_train,
         method="euler", stl=True, adjoint=False, optimizer=None,
         num_steps=200, batch_size_data=None, batch_size_Θ=200, lr=0.001,
-        batchnorm=True, device="cpu", batch_size = None
+        batchnorm=True, device="cpu"
     ):
 
     t_size = int(math.ceil(1.0/Δt))
@@ -24,8 +24,8 @@ def basic_batched_trainer(
     losses = []
     
     avg_loss_list = []
-    batch_size = len(X_train) if batch_size is None else batch_size
-    n_batches = int(len(X_train) / batch_size) 
+    batch_size = len(X_train) if batch_size_data is None else batch_size_data
+    n_batches = int(len(X_train) / batch_size_data) 
     
     
     loss_ = stl_relative_entropy_control_cost if stl else relative_entropy_control_cost
@@ -37,8 +37,8 @@ def basic_batched_trainer(
         
         # stochastic minibatch GD (MC estimate of gradient via subsample)
         for batch in range(n_batches): # Make sure to go through whole dtaset
-            batch_X = X_train[perm,...][batch*batch_size:(batch+1)*batch_size,]
-            batch_y = y_train[perm,...][batch*batch_size:(batch+1)*batch_size,]
+            batch_X = X_train[perm,...][batch*batch_size_data:(batch+1)*batch_size_data,]
+            batch_y = y_train[perm,...][batch*batch_size_data:(batch+1)*batch_size_data,]
             
             optimizer.zero_grad()
 
