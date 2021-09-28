@@ -68,9 +68,9 @@ class FollmerSDE(torch.nn.Module):
         self.device = device
 
         self.γ = γ
-        self.μ = SimpleForwardNet(input_dim=state_size).to(device)
+        self.μ = drift(input_dim=state_size).to(device)
         
-        self.μ_detached = SimpleForwardNet(input_dim=state_size).to(device)
+        self.μ_detached = drift(input_dim=state_size).to(device)
 
     # Drift
     def f(self, t, y):
