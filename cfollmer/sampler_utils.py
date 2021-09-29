@@ -34,8 +34,7 @@ class SimpleForwardNet(torch.nn.Module):
 class SimpleForwardNetBN(torch.nn.Module):
 
     def __init__(self, input_dim=1):
-        super(SimpleForwardNet, self).__init__()
-        bbbbb
+        super(SimpleForwardNetBN, self).__init__()
         
         width = 20
         self.nn = torch.nn.Sequential(
@@ -61,6 +60,8 @@ class FollmerSDE(torch.nn.Module):
         super().__init__()
         self.noise_type = 'diagonal'
         self.sde_type = 'ito'
+        
+        drift = SimpleForwardNetBN if drift is None else drift
         
         self.state_size = state_size
         self.brownian_size = brownian_size

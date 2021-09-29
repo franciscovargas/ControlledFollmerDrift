@@ -10,7 +10,7 @@ def basic_batched_trainer(
         γ, Δt, ln_prior, log_likelihood_vmap, dim, X_train, y_train,
         method="euler", stl=True, adjoint=False, optimizer=None,
         num_steps=200, batch_size_data=None, batch_size_Θ=200, lr=0.001,
-        batchnorm=True, device="cpu"
+        batchnorm=True, device="cpu", drift=None
     ):
 
     t_size = int(math.ceil(1.0/Δt))
@@ -18,7 +18,7 @@ def basic_batched_trainer(
     
     Θ_0 = torch.zeros((batch_size_Θ, dim)).to(device) 
     
-    sde = FollmerSDE(dim, dim, batch_size_Θ  , γ=γ, device=device).to(device)
+    sde = FollmerSDE(dim, dim, batch_size_Θ  , γ=γ, device=device, drift=drift).to(device)
     optimizer = torch.optim.Adam(sde.μ.parameters(), lr=lr, weight_decay=0.5)
     #     optimizer = torch.optim.LBFGS(gpr.parameters(), lr=0.01)
     losses = []
