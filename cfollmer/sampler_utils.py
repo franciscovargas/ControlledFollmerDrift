@@ -35,6 +35,7 @@ class SimpleForwardNetBN(torch.nn.Module):
 
     def __init__(self, input_dim=1):
         super(SimpleForwardNet, self).__init__()
+        bbbbb
         
         width = 20
         self.nn = torch.nn.Sequential(
