@@ -3,6 +3,7 @@ import math
 from cfollmer.objectives import relative_entropy_control_cost, stl_relative_entropy_control_cost
 from cfollmer.sampler_utils import FollmerSDE
 from tqdm.notebook import tqdm
+import gc
 
 
 
