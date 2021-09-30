@@ -67,6 +67,9 @@ def basic_batched_trainer(
                 avg_loss_list.append(loss.item())
             if stl:
                 sde.μ_detached.load_state_dict((sde.μ.state_dict()))
+            # Clear up memory leaks
+            gc.collect()
+            torch.cuda.empty_cache()
         losses.append(torch.mean(torch.tensor(avg_loss_list)))
         avg_loss_list = []
     return sde, losses
