@@ -36,7 +36,7 @@ def basic_batched_trainer(
         perm = torch.randperm(len(X_train))
         
         # stochastic minibatch GD (MC estimate of gradient via subsample)
-        for batch in range(n_batches): # Make sure to go through whole dtaset
+        for batch in tqdm(range(n_batches)): # Make sure to go through whole dtaset
             batch_X = X_train[perm,...][batch*batch_size_data:(batch+1)*batch_size_data,]
             batch_y = y_train[perm,...][batch*batch_size_data:(batch+1)*batch_size_data,]
             
