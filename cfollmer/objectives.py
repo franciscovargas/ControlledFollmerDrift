@@ -11,7 +11,7 @@ from torch import _vmap_internals
 
 from cfollmer.sampler_utils import detach_state_dict
 
-def log_g(Θ, ln_prior, ln_like, γ=1.0):
+def log_g(Θ, ln_prior, ln_like, γ=1.0, debug=False):
     """
     g function in control objective
     
@@ -24,9 +24,11 @@ def log_g(Θ, ln_prior, ln_like, γ=1.0):
 
     ll =ln_like(Θ)
     lp =  ln_prior(Θ)
-    print("Gl", ll.min().item(), ll.max().item())
-    print("Gp", lp.min().item(), lp.max().item())
-    print("Gp", normal_term.min().item(), normal_term.max().item())
+    
+    if debug:
+        print("Gl", ll.min().item(), ll.max().item())
+        print("Gp", lp.min().item(), lp.max().item())
+        print("Gp", normal_term.min().item(), normal_term.max().item())
     if torch.any(torch.isnan(normal_term)) or torch.any(torch.isinf(normal_term)):
         import pdb; pdb.set_trace()
     return ll + ( lp - normal_term)
@@ -47,7 +49,7 @@ def log_g_direct(Θ, ln_prior, ln_like, γ=1.0):
 def relative_entropy_control_cost(
         sde, Θ_0, X, y, ln_prior,
         ln_like, Δt=0.05, γ=1.0,
-        device="cpu", batchnorm=False, method="euler", adjoint=False
+        device="cpu", batchnorm=False, method="euler", adjoint=False, debug=False
     ):
     """
     Objective for the Hamilton-Bellman-Jacobi Follmer Sampler
@@ -71,7 +73,8 @@ def relative_entropy_control_cost(
         μs = f(ts, Θs)
         
     ΘT = Θs[-1] 
-    lng = log_g(ΘT, ln_prior, ln_like_partial, γ)
+    sde.last_samples = ΘT
+    lng = log_g(ΘT, ln_prior, ln_like_partial, γ, debug=debug)
     girsanov_factor = (0.5 / γ) * ((μs**2).sum(axis=-1)).sum(axis=0) * Δt
     
     return (girsanov_factor  - lng).mean()  / X.shape[0]
@@ -80,7 +83,7 @@ def relative_entropy_control_cost(
 def stl_relative_entropy_control_cost(
         sde, Θ_0, X, y, ln_prior,
         ln_like, Δt=0.05, γ=1.0,
-        device="cpu", batchnorm=False, method="euler", adjoint=False
+        device="cpu", batchnorm=False, method="euler", adjoint=False, debug=False
     ):
     """
     Stick the landing objective (Xu et al. 2021) for the
@@ -109,7 +112,8 @@ def stl_relative_entropy_control_cost(
         μs_detached = f_detached(ts, Θs).to(device)
         
     ΘT = Θs[-1] 
-    lng = log_g(ΘT, ln_prior, ln_like_partial, γ)
+    sde.last_samples = ΘT
+    lng = log_g(ΘT, ln_prior, ln_like_partial, γ, debug=debug)
     girsanov_factor_dt = (0.5 / γ) * ((μs**2).sum(axis=-1)).sum(axis=0) * Δt
     
 #     import pdb; pdb.set_trace()
@@ -131,6 +135,7 @@ def relative_entropy_control_cost_direct(sde, Θ_0, ln_prior, Δt=0.05, γ=1.0, 
     Θs =  torchsde.sdeint(sde, Θ_0, ts, method="euler",dt=Δt)
     μs = sde.f(ts, Θs)
     ΘT = Θs[-1] 
+    sde.last_samples = ΘT
     lng = log_g_direct(ΘT, ln_prior, γ)
     girsanov_factor = (0.5 / γ) * ((μs**2).sum(axis=-1)).sum(axis=0) * Δt
     

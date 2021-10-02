@@ -6,12 +6,11 @@ from tqdm.notebook import tqdm
 import gc
 
 
-
 def basic_batched_trainer(
-        γ, Δt, ln_prior, log_likelihood_vmap, dim, X_train, y_train,
+        γ, Δt, ln_prior, log_likelihood_vmap, dim, X_train, y_train,net=None,
         method="euler", stl=True, adjoint=False, optimizer=None,
         num_steps=200, batch_size_data=None, batch_size_Θ=200, lr=0.001,
-        batchnorm=True, device="cpu", drift=None
+        batchnorm=True, device="cpu", drift=None, debug=False
     ):
 
     t_size = int(math.ceil(1.0/Δt))
@@ -23,6 +22,11 @@ def basic_batched_trainer(
     optimizer = torch.optim.Adam(sde.μ.parameters(), lr=lr, weight_decay=0.5)
     #     optimizer = torch.optim.LBFGS(gpr.parameters(), lr=0.01)
     losses = []
+
+    if net is not None:
+        log_likelihood_vmap_c = log_likelihood_vmap
+        def log_likelihood_vmap(Θ, X, y):
+            return log_likelihood_vmap_c(Θ, X, y, net=net)
     
     avg_loss_list = []
     batch_size = len(X_train) if batch_size_data is None else batch_size_data
@@ -35,9 +39,13 @@ def basic_batched_trainer(
         
         # shuffle train (refresh):
         perm = torch.randperm(len(X_train))
-        
+
         # stochastic minibatch GD (MC estimate of gradient via subsample)
         for batch in tqdm(range(n_batches)): # Make sure to go through whole dtaset
+            if batch > 0 and net is not None:
+                thetas = sde.last_samples 
+                cls = net.predict(X_train[:2000], thetas)
+                print( "ACCURACY", (cls == y_train[:2000]).float().mean())
             batch_X = X_train[perm,...][batch*batch_size_data:(batch+1)*batch_size_data,]
             batch_y = y_train[perm,...][batch*batch_size_data:(batch+1)*batch_size_data,]
             
@@ -47,7 +55,8 @@ def basic_batched_trainer(
                 sde, Θ_0.float(),
                 batch_X.float(), batch_y.float(),
                 ln_prior, log_likelihood_vmap, γ=γ,
-                batchnorm=batchnorm, device=device,adjoint=adjoint
+                batchnorm=batchnorm, device=device,adjoint=adjoint,
+                debug=debug
             )
 
             if isinstance(optimizer, torch.optim.LBFGS):
@@ -61,6 +70,8 @@ def basic_batched_trainer(
                 avg_loss_list.append(closure().item())
             else:
                 loss = loss_call()
+
+                print(loss.item())
                 optimizer.zero_grad()
                 loss.backward()
 
