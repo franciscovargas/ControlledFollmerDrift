@@ -44,7 +44,7 @@ def basic_batched_trainer(
 
         # stochastic minibatch GD (MC estimate of gradient via subsample)
         for batch in tqdm(range(n_batches)): # Make sure to go through whole dtaset
-            if batch > 0 or or i > 0 and net is not None:
+            if batch > 0 or  i > 0 and net is not None:
                 thetas = sde.last_samples 
                 cls = net.predict(X_train[:2000], thetas)
                 print( "ACCURACY", (cls == y_train[:2000]).float().mean())
