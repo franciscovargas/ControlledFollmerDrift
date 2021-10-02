@@ -1,6 +1,6 @@
 import torch
 import math
-from cfollmer.objectives import relative_entropy_control_cost, stl_relative_entropy_control_cost
+from cfollmer.objectives import relative_entropy_control_cost, stl_relative_entropy_control_cost, simplified
 from cfollmer.sampler_utils import FollmerSDE
 from tqdm.notebook import tqdm
 import gc
@@ -10,7 +10,7 @@ def basic_batched_trainer(
         γ, Δt, ln_prior, log_likelihood_vmap, dim, X_train, y_train,net=None,
         method="euler", stl=True, adjoint=False, optimizer=None,
         num_steps=200, batch_size_data=None, batch_size_Θ=200, lr=0.001,
-        batchnorm=True, device="cpu", drift=None, debug=False
+        batchnorm=True, device="cpu", drift=None, debug=False, simple=False
     ):
 
     t_size = int(math.ceil(1.0/Δt))
@@ -33,7 +33,9 @@ def basic_batched_trainer(
     n_batches = int(len(X_train) / batch_size_data) 
     
     
-    loss_ = stl_relative_entropy_control_cost if stl else relative_entropy_control_cost
+    loss_ = stl_relative_entropy_control_cost if stl else relative_entropy_control_cost#
+    if simple:
+        loss_ = simplified
 
     for i in tqdm(range(num_steps)):
         
@@ -42,7 +44,7 @@ def basic_batched_trainer(
 
         # stochastic minibatch GD (MC estimate of gradient via subsample)
         for batch in tqdm(range(n_batches)): # Make sure to go through whole dtaset
-            if batch > 0 and net is not None:
+            if batch > 0 or or i > 0 and net is not None:
                 thetas = sde.last_samples 
                 cls = net.predict(X_train[:2000], thetas)
                 print( "ACCURACY", (cls == y_train[:2000]).float().mean())

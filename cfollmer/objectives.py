@@ -46,6 +46,31 @@ def log_g_direct(Θ, ln_prior, ln_like, γ=1.0):
 
 
 
+def simplified(
+        sde, Θ_0, X, y, ln_prior,
+        ln_like, Δt=0.05, γ=1.0,
+        device="cpu", batchnorm=False, method="euler", adjoint=False, debug=False
+    ):
+    """
+    Objective for the Hamilton-Bellman-Jacobi Follmer Sampler
+    """
+    n = int(1.0 / Δt)
+    ts = torch.linspace(0, 1, n).to(device)
+    
+    ln_like_partial = lambda Θ: ln_like(Θ, X, y)
+    
+    if not adjoint:
+        Θs =  torchsde.sdeint(sde, Θ_0, ts, method=method,dt=Δt)
+    else:
+        Θs =  torchsde.sdeint_adjoint(sde, Θ_0, ts, method=method,dt=Δt)
+        
+    ΘT = Θs[-1] 
+    sde.last_samples = ΘT
+    lng = ln_like_partial(ΘT)
+    
+    return  - (lng).mean()  / X.shape[0]
+
+
 def relative_entropy_control_cost(
         sde, Θ_0, X, y, ln_prior,
         ln_like, Δt=0.05, γ=1.0,
