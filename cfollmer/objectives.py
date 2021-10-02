@@ -18,9 +18,18 @@ def log_g(Θ, ln_prior, ln_like, γ=1.0):
     g is the Radon-Nikodym derivtive between
     the joint and N(0, γ I)
     """
+    if torch.any(torch.isnan(Θ)) or torch.any(torch.isinf(Θ)):
+        import pdb; pdb.set_trace()
     normal_term = -0.5 * (Θ**2).sum(axis=1) / γ
 
-    return ln_like(Θ) + ( ln_prior(Θ) - normal_term)
+    ll =ln_like(Θ)
+    lp =  ln_prior(Θ)
+    print("Gl", ll.min().item(), ll.max().item())
+    print("Gp", lp.min().item(), lp.max().item())
+    print("Gp", normal_term.min().item(), normal_term.max().item())
+    if torch.any(torch.isnan(normal_term)) or torch.any(torch.isinf(normal_term)):
+        import pdb; pdb.set_trace()
+    return ll + ( lp - normal_term)
 
 
 def log_g_direct(Θ, ln_prior, ln_like, γ=1.0):
@@ -65,7 +74,7 @@ def relative_entropy_control_cost(
     lng = log_g(ΘT, ln_prior, ln_like_partial, γ)
     girsanov_factor = (0.5 / γ) * ((μs**2).sum(axis=-1)).sum(axis=0) * Δt
     
-    return (girsanov_factor  - lng).mean()
+    return (girsanov_factor  - lng).mean()  / X.shape[0]
 
 
 def stl_relative_entropy_control_cost(
@@ -109,7 +118,7 @@ def stl_relative_entropy_control_cost(
 
     girsanov_factor = girsanov_factor_dt + girsanov_factor_dW
     
-    return (girsanov_factor  - lng).mean()
+    return (girsanov_factor  - lng).mean()  / X.shape[0]
 
 
 def relative_entropy_control_cost_direct(sde, Θ_0, ln_prior, Δt=0.05, γ=1.0, device="cpu"):
