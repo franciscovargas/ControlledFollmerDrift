@@ -10,7 +10,7 @@ def basic_batched_trainer(
         γ, Δt, ln_prior, log_likelihood_vmap, dim, X_train, y_train,net=None,
         method="euler", stl=True, adjoint=False, optimizer=None,
         num_steps=200, batch_size_data=None, batch_size_Θ=200, lr=0.001,
-        batchnorm=True, device="cpu", drift=None, debug=False, simple=False
+        batchnorm=True, device="cpu", drift=None, debug=False, simple=False, tqdm_flag=False
     ):
 
     t_size = int(math.ceil(1.0/Δt))
@@ -36,7 +36,8 @@ def basic_batched_trainer(
     loss_ = stl_relative_entropy_control_cost if stl else relative_entropy_control_cost#
     if simple:
         loss_ = simplified
-
+    
+    tqdm = tqdm if tqdm_flag else (lambda x: x)
     for i in tqdm(range(num_steps)):
         
         # shuffle train (refresh):
