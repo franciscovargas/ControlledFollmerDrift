@@ -1,9 +1,18 @@
 import torch
 import math
-from cfollmer.objectives import relative_entropy_control_cost, stl_relative_entropy_control_cost, simplified
+from cfollmer.objectives import relative_entropy_control_cost, stl_relative_entropy_control_cost_xu, simplified, stl_relative_entropy_control_cost_nik
 from cfollmer.sampler_utils import FollmerSDE
 from tqdm.notebook import tqdm
 import gc
+
+
+estimators = {
+    "stl_xu": stl_relative_entropy_control_cost_xu,
+    "stl_nik": stl_relative_entropy_control_cost_nik,
+    "stl_sharper_nik": lambda *args, **kwargs: stl_relative_entropy_control_cost_nik(*args, **kwargs, dw=False),
+    "girsanov": relative_entropy_control_cost
+    
+}
 
 
 def basic_batched_trainer(
@@ -33,7 +42,8 @@ def basic_batched_trainer(
     n_batches = int(len(X_train) / batch_size_data) 
     
     
-    loss_ = stl_relative_entropy_control_cost if stl else relative_entropy_control_cost#
+    key = ("stl_xu" if stl else "girsanov") if isinstance(stl, bool) else stl
+    loss_ = estimators[key]
     if simple:
         loss_ = simplified
     
