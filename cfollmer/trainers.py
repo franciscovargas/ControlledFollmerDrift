@@ -37,14 +37,14 @@ def basic_batched_trainer(
     if simple:
         loss_ = simplified
     
-    tqdm = tqdm if tqdm_flag else (lambda x: x)
+    tqdm2 = tqdm if tqdm_flag else (lambda x: x)
     for i in tqdm(range(num_steps)):
         
         # shuffle train (refresh):
         perm = torch.randperm(len(X_train))
 
         # stochastic minibatch GD (MC estimate of gradient via subsample)
-        for batch in tqdm(range(n_batches)): # Make sure to go through whole dtaset
+        for batch in tqdm2(range(n_batches)): # Make sure to go through whole dtaset
             if (batch > 0 or  i > 0) and net is not None:
                 thetas = sde.last_samples 
                 cls = net.predict(X_train[:2000], thetas)
