@@ -93,6 +93,26 @@ class ResNetScoreNetwork(torch.nn.Module):
         return self.final_block(h)
 
 
+class LeNet5MNIST(torch.nn.Module):
+    def __init__(self, channels: int = 1, out_dims: int = 10):
+        super().__init__()
+
+        # make_functional does not work with LazyLinear
+        self.net = torch.nn.Sequential(
+            torch.nn.Conv2d(1, 6, (5, 5), padding=2), torch.nn.Sigmoid(),
+            torch.nn.AvgPool2d((2, 2), 2),
+            torch.nn.Conv2d(6, 16, (5, 5)), torch.nn.Sigmoid(),
+            torch.nn.AvgPool2d((2, 2), 2),
+            torch.nn.Flatten(),
+            torch.nn.Linear(400, 120), torch.nn.Sigmoid(),
+            torch.nn.Linear(120, 84), torch.nn.Sigmoid(),
+            torch.nn.Linear(84, 10)
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+
 class FollmerSDE(torch.nn.Module):
 
     def __init__(self, state_size=1, brownian_size=1,
