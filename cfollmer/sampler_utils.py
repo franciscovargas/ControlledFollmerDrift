@@ -56,20 +56,24 @@ class FollmerSDE(torch.nn.Module):
 
     def __init__(self, state_size=1, brownian_size=1, 
                  batch_size=10, γ=1.0, drift=SimpleForwardNet,
-                device="cpu"):
+                device="cpu", diffusion_type="uniform", γ_max=0.5, γ_min=0.04):
         super().__init__()
         self.noise_type = 'diagonal'
         self.sde_type = 'ito'
         
         drift = SimpleForwardNetBN if drift is None else drift
         
+        self.diffusion_type = diffusion_type
+        
         self.state_size = state_size
         self.brownian_size = brownian_size
         self.batch_size = batch_size
-        
+#         
         self.device = device
 
         self.γ = γ
+        self.γ_max = γ_max
+        self.γ_min = γ_min
         self.μ = drift(input_dim=state_size).to(device)
         
         self.μ_detached = drift(input_dim=state_size).to(device)
@@ -97,5 +101,16 @@ class FollmerSDE(torch.nn.Module):
 
     # Diffusion
     def g(self, t, y):
+       
+        if self.diffusion_type == "uniform":
+            γ_t = self.γ
+        elif self.diffusion_type == "linear":
+            Δγ = (self.γ_max- self.γ_min)
+            pos_slope = 2 * t * Δγ * (t < 0.5 )
+            neg_slope = 2 * (1-t) * Δγ * (t >= 0.5 )
+            γ_t = self.γ_min + pos_slope + neg_slope
+        else:
+            raise BaseException(f"{diffusion_type} schedule not implemented")
+            
         diffusion = (torch.ones_like(y).to(self.device) * self.γ)  
         return diffusion
