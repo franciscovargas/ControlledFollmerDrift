@@ -21,7 +21,7 @@ def log_g(Θ, ln_prior, ln_like, γ=1.0, debug=False):
     """
     if torch.any(torch.isnan(Θ)) or torch.any(torch.isinf(Θ)):
         import pdb; pdb.set_trace()
-    normal_term = -0.5 * (Θ**2).sum(axis=1) / γ
+    normal_term = -0.5 * ((Θ / γ)**2).sum(axis=1) 
 
     ll =ln_like(Θ)
     lp =  ln_prior(Θ)
@@ -32,6 +32,7 @@ def log_g(Θ, ln_prior, ln_like, γ=1.0, debug=False):
         print("Gp", normal_term.min().item(), normal_term.max().item())
     if torch.any(torch.isnan(normal_term)) or torch.any(torch.isinf(normal_term)):
         import pdb; pdb.set_trace()
+    
     return ll + ( lp - normal_term)
 
 
@@ -100,8 +101,11 @@ def relative_entropy_control_cost(
         
     ΘT = Θs[-1] 
     sde.last_samples = ΘT
-    lng = log_g(ΘT, ln_prior, ln_like_partial, γ, debug=debug)
-    girsanov_factor = (0.5 / γ) * ((μs**2).sum(axis=-1)).sum(axis=0) * Δt
+    lng = log_g(ΘT, ln_prior, ln_like_partial, γ_t[-1,0,0], debug=debug)
+    
+    γ_t = sde.g(ts, Θs)
+    import pdb;pdb.set_trace()
+    girsanov_factor = (0.5 * (( (μs / γ_t)**2).sum(axis=-1)) ).sum(axis=0) * Δt
     
     return (girsanov_factor  - lng).mean()  / X.shape[0]
 
@@ -140,12 +144,16 @@ def stl_relative_entropy_control_cost_xu(
         
     ΘT = Θs[-1] 
     sde.last_samples = ΘT
-    lng = log_g(ΘT, ln_prior, ln_like_partial, γ, debug=debug)
-    girsanov_factor_dt = (0.5 / γ) * ((μs**2).sum(axis=-1)).sum(axis=0) * Δt
+    
+    γ_t = sde.g(ts, Θs)
+    import pdb;pdb.set_trace()
+    lng = log_g(ΘT, ln_prior, ln_like_partial, γ_t[-1,0,0], debug=debug)
+    girsanov_factor_dt =  0.5 * (((μs / γ_t)**2).sum(axis=-1)).sum(axis=0) * Δt
     
 #     import pdb; pdb.set_trace()
+    
     dW = torch.normal(mean=0.0, std=math.sqrt(Δt), size=μs_detached.shape).to(device)
-    girsanov_factor_dW = (1.0 / γ) * (torch.einsum("ijk,ijk->ij", μs_detached, dW)).sum(axis=0).mean()
+    girsanov_factor_dW =  (torch.einsum("ijk,ijk->ij", μs_detached / γ_t, dW)).sum(axis=0).mean()
 
     girsanov_factor = girsanov_factor_dt + girsanov_factor_dW
     
@@ -183,16 +191,18 @@ def stl_relative_entropy_control_cost_nik(
         f_detached = _vmap_internals.vmap(sde.f_detached) 
 #         μs = f(ts, Θs)
         μs_detached = f_detached(ts, Θs).to(device)
-        
+    
+    γ_t = sde.g(ts, Θs)
+    import pdb;pdb.set_trace()
     ΘT = Θs[-1] 
     sde.last_samples = ΘT
-    lng = log_g(ΘT, ln_prior, ln_like_partial, γ, debug=debug)
-    girsanov_factor_dt = (0.5 / γ) * ((μs_detached**2).sum(axis=-1)).sum(axis=0) * Δt
+    lng = log_g(ΘT, ln_prior, ln_like_partial, γ_t[-1,0,0], debug=debug)
+    girsanov_factor_dt = 0.5  * (( (μs_detached / γ_t)**2).sum(axis=-1)).sum(axis=0) * Δt
     
 #     import pdb; pdb.set_trace()
     if dw:
         dW = torch.normal(mean=0.0, std=math.sqrt(Δt), size=μs_detached.shape).to(device)
-        girsanov_factor_dW = (1.0 / γ) * (torch.einsum("ijk,ijk->ij", μs_detached, dW)).sum(axis=0).mean()
+        girsanov_factor_dW =  (torch.einsum("ijk,ijk->ij", μs_detached / γ_t, dW)).sum(axis=0).mean()
     else:
         girsanov_factor_dW = 0
 
@@ -200,19 +210,3 @@ def stl_relative_entropy_control_cost_nik(
     
     return (girsanov_factor  - lng).mean()  / X.shape[0]
 
-
-def relative_entropy_control_cost_direct(sde, Θ_0, ln_prior, Δt=0.05, γ=1.0, device="cpu"):
-    """
-    Objective for the Hamilton-Bellman-Jacobi Follmer Sampler
-    """
-    n = int(1.0 / Δt)
-    ts = torch.linspace(0, 1, n).to(device)
-        
-    Θs =  torchsde.sdeint(sde, Θ_0, ts, method="euler",dt=Δt)
-    μs = sde.f(ts, Θs)
-    ΘT = Θs[-1] 
-    sde.last_samples = ΘT
-    lng = log_g_direct(ΘT, ln_prior, γ)
-    girsanov_factor = (0.5 / γ) * ((μs**2).sum(axis=-1)).sum(axis=0) * Δt
-    
-    return (girsanov_factor - lng).mean()

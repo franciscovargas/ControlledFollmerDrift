@@ -1,6 +1,6 @@
 import torch
 from collections import OrderedDict
-from layers import ResBlock, get_timestep_embedding
+from cfollmer.layers import ResBlock, get_timestep_embedding
 
 
 
@@ -154,9 +154,9 @@ class FollmerSDE(torch.nn.Module):
             Δγ = (self.γ_max- self.γ_min)
             pos_slope = 2 * t * Δγ * (t < 0.5 )
             neg_slope = 2 * (1-t) * Δγ * (t >= 0.5 )
-            γ_t = self.γ_min + pos_slope + neg_slope
+            γ_t = (self.γ_min + pos_slope + neg_slope)[...,None,None]
         else:
             raise BaseException(f"{diffusion_type} schedule not implemented")
             
-        diffusion = (torch.ones_like(y).to(self.device) * self.γ)  
+        diffusion = (torch.ones_like(y).to(self.device) * γ_t)  
         return diffusion
