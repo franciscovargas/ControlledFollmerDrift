@@ -132,7 +132,7 @@ class FollmerSDE(torch.nn.Module):
         t_ = t.to(self.device) * torch.ones(d,1).to(self.device)
         t_ = t_ if len(y.shape) == 2 else t_.T[...,None]
         y = torch.cat((y, t_), dim=-1)
-
+        
         return self.μ(y)   # shape (batch_size, state_size)
     
     def f_detached(self, t, y):
@@ -154,9 +154,9 @@ class FollmerSDE(torch.nn.Module):
             Δγ = (self.γ_max- self.γ_min)
             pos_slope = 2 * t * Δγ * (t < 0.5 )
             neg_slope = 2 * (1-t) * Δγ * (t >= 0.5 )
-            γ_t = (self.γ_min + pos_slope + neg_slope)[...,None,None]
+            γ_t = (self.γ_min + pos_slope + neg_slope)
         else:
             raise BaseException(f"{diffusion_type} schedule not implemented")
             
-        diffusion = (torch.ones_like(y).to(self.device) * γ_t)  
-        return diffusion
+        diffusion = (torch.ones_like(y).to(self.device) * γ_t) 
+        return torch.sqrt(diffusion)

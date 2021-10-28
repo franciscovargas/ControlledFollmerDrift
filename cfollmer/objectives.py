@@ -21,7 +21,8 @@ def log_g(Θ, ln_prior, ln_like, γ=1.0, debug=False):
     """
     if torch.any(torch.isnan(Θ)) or torch.any(torch.isinf(Θ)):
         import pdb; pdb.set_trace()
-    normal_term = -0.5 * ((Θ / γ)**2).sum(axis=1) 
+
+    normal_term = -0.5 * (Θ**2 / γ).sum(axis=1) 
 
     ll =ln_like(Θ)
     lp =  ln_prior(Θ)
@@ -145,10 +146,13 @@ def stl_relative_entropy_control_cost_xu(
     ΘT = Θs[-1] 
     sde.last_samples = ΘT
     
-    γ_t = sde.g(ts, Θs)
-    import pdb;pdb.set_trace()
-    lng = log_g(ΘT, ln_prior, ln_like_partial, γ_t[-1,0,0], debug=debug)
-    girsanov_factor_dt =  0.5 * (((μs / γ_t)**2).sum(axis=-1)).sum(axis=0) * Δt
+
+    g = _vmap_internals.vmap(sde.g)
+    γ_t = g(ts, Θs)
+    # import pdb;pdb.set_trace()
+    lng = log_g(ΘT, ln_prior, ln_like_partial, γ_t[-1], debug=debug)
+
+    girsanov_factor_dt =  0.5 * ((μs**2 / γ_t).sum(axis=-1)).sum(axis=0) * Δt
     
 #     import pdb; pdb.set_trace()
     
