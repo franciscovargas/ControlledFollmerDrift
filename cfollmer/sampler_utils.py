@@ -127,20 +127,28 @@ class FollmerSDE(torch.nn.Module):
     # Drift
     def f(self, t, y):
         
-        # This is ugly should be cleaned up made more clear
         d = y.shape[0] if len(y.shape) == 2 else y.shape[1]
         t_ = t.to(self.device) * torch.ones(d,1).to(self.device)
         t_ = t_ if len(y.shape) == 2 else t_.T[...,None]
+        
+        if "ResNetScoreNetwork" in str(self.μ):
+            return self.μ(y, t_)
+        
+        # This is ugly should be cleaned up made more clear
         y = torch.cat((y, t_), dim=-1)
         
         return self.μ(y)   # shape (batch_size, state_size)
     
     def f_detached(self, t, y):
         # For STL estimator
-   
+        
         d = y.shape[0] if len(y.shape) == 2 else y.shape[1]
         t_ = t.to(self.device) * torch.ones(d,1).to(self.device)
         t_ = t_ if len(y.shape) == 2 else t_.T[...,None]
+        
+        if "ResNetScoreNetwork" in str(self.μ):
+            return self.μ_detached(y, t_)  
+        
         y = torch.cat((y, t_), dim=-1)
 
         return self.μ_detached(y)  

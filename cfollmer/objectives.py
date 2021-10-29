@@ -101,12 +101,14 @@ def relative_entropy_control_cost(
         μs = f(ts, Θs)
         
     ΘT = Θs[-1] 
+    g = _vmap_internals.vmap(sde.g)
+    γ_t = g(ts, Θs)
     sde.last_samples = ΘT
     lng = log_g(ΘT, ln_prior, ln_like_partial, γ_t[-1,0,0], debug=debug)
     
-    γ_t = sde.g(ts, Θs)
-    import pdb;pdb.set_trace()
-    girsanov_factor = (0.5 * (( (μs / γ_t)**2).sum(axis=-1)) ).sum(axis=0) * Δt
+    
+#     import pdb;pdb?/??.set_trace()
+    girsanov_factor = (0.5 * (( (μs )**2 / γ_t).sum(axis=-1)) ).sum(axis=0) * Δt
     
     return (girsanov_factor  - lng).mean()  / X.shape[0]
 
@@ -157,7 +159,7 @@ def stl_relative_entropy_control_cost_xu(
 #     import pdb; pdb.set_trace()
     
     dW = torch.normal(mean=0.0, std=math.sqrt(Δt), size=μs_detached.shape).to(device)
-    girsanov_factor_dW =  (torch.einsum("ijk,ijk->ij", μs_detached / γ_t, dW)).sum(axis=0).mean()
+    girsanov_factor_dW =  (torch.einsum("ijk,ijk->ij", μs_detached / torch.sqrt(γ_t), dW)).sum(axis=0).mean()
 
     girsanov_factor = girsanov_factor_dt + girsanov_factor_dW
     
@@ -196,17 +198,18 @@ def stl_relative_entropy_control_cost_nik(
 #         μs = f(ts, Θs)
         μs_detached = f_detached(ts, Θs).to(device)
     
-    γ_t = sde.g(ts, Θs)
-    import pdb;pdb.set_trace()
+    g = _vmap_internals.vmap(sde.g)
+    γ_t = g(ts, Θs)
+#     import pdb;pdb.set_trace()
     ΘT = Θs[-1] 
     sde.last_samples = ΘT
     lng = log_g(ΘT, ln_prior, ln_like_partial, γ_t[-1,0,0], debug=debug)
-    girsanov_factor_dt = 0.5  * (( (μs_detached / γ_t)**2).sum(axis=-1)).sum(axis=0) * Δt
+    girsanov_factor_dt = 0.5  * (( (μs_detached)**2 / γ_t).sum(axis=-1)).sum(axis=0) * Δt
     
 #     import pdb; pdb.set_trace()
     if dw:
         dW = torch.normal(mean=0.0, std=math.sqrt(Δt), size=μs_detached.shape).to(device)
-        girsanov_factor_dW =  (torch.einsum("ijk,ijk->ij", μs_detached / γ_t, dW)).sum(axis=0).mean()
+        girsanov_factor_dW =  (torch.einsum("ijk,ijk->ij", μs_detached / torch.sqrt(γ_t), dW)).sum(axis=0).mean()
     else:
         girsanov_factor_dW = 0
 
