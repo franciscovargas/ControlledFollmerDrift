@@ -12,7 +12,18 @@ def detach_state_dict(state_dict):
     return v
 
 
-class SimpleForwardNet(torch.nn.Module):
+class AbstractDrift(torch.nn.Module):
+
+    def __init__(self, input_dim=1):
+        super(AbstractDrift, self).__init__()
+
+    def forward(self, x):
+        x = torch.cat((x, t), dim=-1)
+        return self.nn(x)
+
+
+
+class SimpleForwardNet(AbstractDrift):
 
     def __init__(self, input_dim=1):
         super(SimpleForwardNet, self).__init__()
@@ -27,13 +38,9 @@ class SimpleForwardNet(torch.nn.Module):
         )
         
         self.nn[-1].weight.data.fill_(0.0)
-        
-
-    def forward(self, x):
-        return self.nn(x)
 
     
-class SimpleForwardNetBN(torch.nn.Module):
+class SimpleForwardNetBN(AbstractDrift):
 
     def __init__(self, input_dim=1):
         super(SimpleForwardNetBN, self).__init__()
@@ -48,14 +55,9 @@ class SimpleForwardNetBN(torch.nn.Module):
         )
         
         self.nn[-1].weight.data.fill_(0.0)
-        
-
-    def forward(self, x):
-        return self.nn(x)
-    
 
 
-class ResNetScoreNetwork(torch.nn.Module):
+class ResNetScoreNetwork(AbstractDrift):
 
     def __init__(self,
                  input_dim: int = 1,
@@ -131,14 +133,8 @@ class FollmerSDE(torch.nn.Module):
         t_ = t.to(self.device) * torch.ones(d,1).to(self.device)
         t_ = t_ if len(y.shape) == 2 else t_.T[...,None]
         
-        if "ResNetScoreNetwork" in str(self.μ):
-            return self.μ(y, t_)
-        
-        # This is ugly should be cleaned up made more clear
-        y = torch.cat((y, t_), dim=-1)
-        
-        return self.μ(y)   # shape (batch_size, state_size)
-    
+        return self.μ(y, t_)
+
     def f_detached(self, t, y):
         # For STL estimator
         
