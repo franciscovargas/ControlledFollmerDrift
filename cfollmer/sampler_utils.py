@@ -17,7 +17,7 @@ class AbstractDrift(torch.nn.Module):
     def __init__(self, input_dim=1):
         super(AbstractDrift, self).__init__()
 
-    def forward(self, x):
+    def forward(self, x, t):
         x = torch.cat((x, t), dim=-1)
         return self.nn(x)
 
@@ -142,12 +142,12 @@ class FollmerSDE(torch.nn.Module):
         t_ = t.to(self.device) * torch.ones(d,1).to(self.device)
         t_ = t_ if len(y.shape) == 2 else t_.T[...,None]
         
-        if "ResNetScoreNetwork" in str(self.μ):
-            return self.μ_detached(y, t_)  
+#         if "ResNetScoreNetwork" in str(self.μ):
+#             return self.μ_detached(y, t_)  
         
-        y = torch.cat((y, t_), dim=-1)
+#         y = torch.cat((y, t_), dim=-1)
 
-        return self.μ_detached(y)  
+        return self.μ_detached(y, t_)  
 
     # Diffusion
     def g(self, t, y):
