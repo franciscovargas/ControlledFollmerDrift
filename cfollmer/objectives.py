@@ -9,6 +9,12 @@ import numpy as np
 
 from torch import _vmap_internals
 
+try:
+    from functorch import vmap
+    print("functorch succesfully imported")
+except:
+    vmap = _vmap_internals.vmap
+
 from cfollmer.sampler_utils import detach_state_dict
 
 
@@ -97,11 +103,11 @@ def relative_entropy_control_cost(
     else:
         def f_(t, x):
             return sde.f(t, x)
-        f = _vmap_internals.vmap(f_) 
+        f = vmap(f_) 
         μs = f(ts, Θs)
         
     ΘT = Θs[-1] 
-    g = _vmap_internals.vmap(sde.g)
+    g = vmap(sde.g)
     γ_t = g(ts, Θs)
     sde.last_samples = ΘT
     lng = log_g(ΘT, ln_prior, ln_like_partial, γ_t[-1,0,0], debug=debug)
@@ -140,8 +146,8 @@ def stl_relative_entropy_control_cost_xu(
         def f_(t, x):
             return sde.f(t, x)
         
-        f = _vmap_internals.vmap(f_) 
-        f_detached = _vmap_internals.vmap(sde.f_detached) 
+        f = vmap(f_) 
+        f_detached = vmap(sde.f_detached) 
         μs = f(ts, Θs)
         μs_detached = f_detached(ts, Θs).to(device)
         
@@ -149,7 +155,7 @@ def stl_relative_entropy_control_cost_xu(
     sde.last_samples = ΘT
     
 
-    g = _vmap_internals.vmap(sde.g)
+    g = vmap(sde.g)
     γ_t = g(ts, Θs)
     # import pdb;pdb.set_trace()
     lng = log_g(ΘT, ln_prior, ln_like_partial, γ_t[-1], debug=debug)
@@ -193,12 +199,12 @@ def stl_relative_entropy_control_cost_nik(
         def f_(t, x):
             return sde.f(t, x)
         
-        f = _vmap_internals.vmap(f_) 
-        f_detached = _vmap_internals.vmap(sde.f_detached) 
+        f = vmap(f_) 
+        f_detached = vmap(sde.f_detached) 
 #         μs = f(ts, Θs)
         μs_detached = f_detached(ts, Θs).to(device)
     
-    g = _vmap_internals.vmap(sde.g)
+    g = vmap(sde.g)
     γ_t = g(ts, Θs)
 #     import pdb;pdb.set_trace()
     ΘT = Θs[-1] 
