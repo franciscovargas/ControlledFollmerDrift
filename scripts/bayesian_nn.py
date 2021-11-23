@@ -64,7 +64,7 @@ func_model, params = functorch.make_functional(model)
 size_list = functional.params_to_size_tuples(params)
 dim = functional.get_number_of_params(size_list)
 
-sigma2 = 1.
+sigma2 = 0.1
 
 
 def log_prior(params):
@@ -93,9 +93,9 @@ def log_posterior_batch(x, y, params_batch):
 
 
 def train(gamma, n_epochs, data_batch_size, param_batch_size, dt=0.05):
-    # sde = FollmerSDE(gamma, SimpleForwardNetBN(input_dim=dim, width=300)).to(device)
+    sde = FollmerSDE(gamma, SimpleForwardNetBN(input_dim=dim, width=300)).to(device)
     # sde = FollmerSDE(gamma, ScoreNetwork(dim)).to(device)
-    sde = FollmerSDE(gamma, ResNetScoreNetwork(dim)).to(device)
+    #sde = FollmerSDE(gamma, ResNetScoreNetwork(dim)).to(device)
     optimizer = torch.optim.Adam(sde.parameters(), lr=1e-5)
 
     dataloader_train = DataLoader(MNIST_train, shuffle=True, batch_size=data_batch_size, num_workers=5)
@@ -133,7 +133,7 @@ def train(gamma, n_epochs, data_batch_size, param_batch_size, dt=0.05):
 
 
 gamma = 0.1**2
-n_epochs = 20
+n_epochs = 10
 n_models = 3
 data_batch_size = 400
 param_batch_size = 100
@@ -183,9 +183,9 @@ def evaluate(param_samples):
 accuracies, eces, logps = [], [], []
 
 for i in range(n_models):
-    # sde = FollmerSDE(gamma, SimpleForwardNetBN(input_dim=dim, width=300)).to(device)
+    sde = FollmerSDE(gamma, SimpleForwardNetBN(input_dim=dim, width=300)).to(device)
     # sde = FollmerSDE(gamma, ScoreNetwork(dim)).to(device)
-    sde = FollmerSDE(gamma, ResNetScoreNetwork(dim)).to(device)
+    # sde = FollmerSDE(gamma, ResNetScoreNetwork(dim)).to(device)
     sde.load_state_dict(torch.load("weights/bnn/weights-{:d}.pt".format(i)))
 
     with torch.no_grad():
