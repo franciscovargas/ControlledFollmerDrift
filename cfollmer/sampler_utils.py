@@ -18,8 +18,8 @@ class FollmerSDE(torch.nn.Module):
     def f(self, t, y, detach=False):
         t_ = t * torch.ones((y.shape[0], 1), device=y.device)
         if detach:
-            return self.drift_network_detatched(t_, y)
-        return self.drift_network(t_, y)
+            return self.drift_network_detatched(y, t_)
+        return self.drift_network(y, t_)
         
     def g(self, t, y):
         return torch.sqrt(self.gamma * torch.ones_like(y))
