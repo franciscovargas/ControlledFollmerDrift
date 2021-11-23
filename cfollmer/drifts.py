@@ -1,10 +1,11 @@
 import torch
 
+from .layers import ResBlock, get_timestep_embedding
 
 
 class AbstractDrift(torch.nn.Module):
 
-    def __init__(self, input_dim=1):
+    def __init__(self):
         super(AbstractDrift, self).__init__()
 
     def forward(self, x, t):
@@ -12,19 +13,19 @@ class AbstractDrift(torch.nn.Module):
         return self.nn(x)
 
 
-
 class SimpleForwardNet(AbstractDrift):
 
-    def __init__(self, input_dim=1):
+    def __init__(self, input_dim=1, width=20):
         super(SimpleForwardNet, self).__init__()
+
+        self.input_dim = input_dim
         
-        width = 20
         self.nn = torch.nn.Sequential(
             torch.nn.Linear(input_dim + 1, width), torch.nn.ReLU(),
             torch.nn.Linear(width, width), torch.nn.ReLU(),
             torch.nn.Linear(width, width), torch.nn.ReLU(),
             torch.nn.Linear(width, width), torch.nn.ReLU(),
-            torch.nn.Linear(width, input_dim )
+            torch.nn.Linear(width, input_dim),
         )
         
         self.nn[-1].weight.data.fill_(0.0)
@@ -32,19 +33,21 @@ class SimpleForwardNet(AbstractDrift):
     
 class SimpleForwardNetBN(AbstractDrift):
 
-    def __init__(self, input_dim=1):
+    def __init__(self, input_dim=1, width=20):
         super(SimpleForwardNetBN, self).__init__()
+
+        self.input_dim = input_dim
         
-        width = 20
         self.nn = torch.nn.Sequential(
-            torch.nn.Linear(input_dim + 1, width), torch.nn.BatchNorm1d(width, affine=False), torch.nn.ReLU(),
-            torch.nn.Linear(width, width), torch.nn.BatchNorm1d(width, affine=False), torch.nn.ReLU(),
-            torch.nn.Linear(width, width), torch.nn.BatchNorm1d(width, affine=False), torch.nn.ReLU(),
-            torch.nn.Linear(width, width), torch.nn.BatchNorm1d(width, affine=False), torch.nn.ReLU(),
-            torch.nn.Linear(width, input_dim )
+            torch.nn.Linear(input_dim + 1, width), torch.nn.BatchNorm1d(width, affine=False), torch.nn.Softplus(),
+            torch.nn.Linear(width, width), torch.nn.BatchNorm1d(width, affine=False), torch.nn.Softplus(),
+            torch.nn.Linear(width, width), torch.nn.BatchNorm1d(width, affine=False), torch.nn.Softplus(),
+            torch.nn.Linear(width, width), torch.nn.BatchNorm1d(width, affine=False), torch.nn.Softplus(),
+            torch.nn.Linear(width, input_dim)
         )
         
         self.nn[-1].weight.data.fill_(0.0)
+        self.nn[-1].bias.data.fill_(0.0)
 
 
 class ResNetScoreNetwork(AbstractDrift):
@@ -63,6 +66,8 @@ class ResNetScoreNetwork(AbstractDrift):
             res_block_final_widths = [pos_dim, pos_dim, pos_dim]
         if res_block_inner_layers is None:
             res_block_inner_layers = [128, 128]
+
+        self.input_dim = input_dim
 
         self.temb_dim = pos_dim
 
