@@ -1,5 +1,7 @@
 import torch
 import torchsde
+import copy
+
 
 class FollmerSDE(torch.nn.Module):
 
@@ -10,10 +12,13 @@ class FollmerSDE(torch.nn.Module):
         self.sde_type = 'ito'
         self.gamma = gamma
         self.drift_network = drift_network
+        self.drift_network_detatched = copy.deepcopy(drift_network)
         self.dim = drift_network.input_dim
         
-    def f(self, t, y):
+    def f(self, t, y, detach=False):
         t_ = t * torch.ones((y.shape[0], 1), device=y.device)
+        if detach:
+            return self.drift_network_detatched(t_, y)
         return self.drift_network(t_, y)
         
     def g(self, t, y):
