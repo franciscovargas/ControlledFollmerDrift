@@ -84,6 +84,48 @@ class ResNetScoreNetwork(AbstractDrift):
         # Final_block
         self.final_block = torch.nn.Sequential(torch.nn.Linear(self.temb_dim * 2 + initial_dim, input_dim))
 
+    def forward(self, x, t):
+        # t needs the same shape as x (except for the final dim, which is 1)
+        t_emb = get_timestep_embedding(t, self.temb_dim)
+        t_emb = self.time_block(t_emb)
+        x_emb = self.res_sequence(x)
+        h = torch.cat([x_emb, t_emb], -1)
+        return self.final_block(h)
+
+
+class ResNetScoreNetworkLarge(AbstractDrift):
+
+    # def __init__(self,
+    #              input_dim: int = 1,
+    #              pos_dim: int = 16,
+    #              res_block_initial_widths=None,
+    #              res_block_final_widths=None,
+    #              res_block_inner_layers=None,
+    #              activation=torch.nn.SiLU()):
+    def __init__(self, input_dim: int):
+        super().__init__()
+        res_block_initial_widths = [300, 300, 300]
+        res_block_final_widths = [300, 300, 300]
+        res_block_inner_layers = [300, 300, 300]
+
+        self.input_dim = input_dim
+
+        self.temb_dim = 128
+
+        # ResBlock Sequence
+        res_layers = []
+        initial_dim = input_dim
+        for initial, final in zip(res_block_initial_widths, res_block_final_widths):
+            res_layers.append(ResBlock(initial_dim, initial, final, res_block_inner_layers, torch.nn.Softplus()))
+            initial_dim = initial + final
+        self.res_sequence = torch.nn.Sequential(*res_layers)
+
+        # Time FCBlock
+        self.time_block = torch.nn.Sequential(torch.nn.Linear(self.temb_dim, self.temb_dim * 2), torch.nn.Softplus())
+
+        # Final_block
+        self.final_block = torch.nn.Sequential(torch.nn.Linear(self.temb_dim * 2 + initial_dim, input_dim))
+
         self.final_block[-1].weight.data.fill_(0.0)
         self.final_block[-1].bias.data.fill_(0.0)
 
