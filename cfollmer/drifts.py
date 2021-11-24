@@ -84,6 +84,9 @@ class ResNetScoreNetwork(AbstractDrift):
         # Final_block
         self.final_block = torch.nn.Sequential(torch.nn.Linear(self.temb_dim * 2 + initial_dim, input_dim))
 
+        self.final_block[-1].weight.data.fill_(0.0)
+        self.final_block[-1].bias.data.fill_(0.0)
+
     def forward(self, x, t):
         # t needs the same shape as x (except for the final dim, which is 1)
         t_emb = get_timestep_embedding(t, self.temb_dim)
@@ -99,9 +102,9 @@ class ScoreNetwork(torch.nn.Module):
     def __init__(self, input_dim: int):
         super().__init__()
         self.input_dim = input_dim
-        decoder_layers = [600, 600]
-        encoder_layers = [600, 600]
-        pos_dim = 100
+        decoder_layers = [300, 300]
+        encoder_layers = [300]
+        pos_dim = 150
         self.temb_dim = pos_dim
         t_enc_dim = pos_dim * 2
         self.locals = [encoder_layers, pos_dim, decoder_layers, input_dim]
@@ -109,16 +112,17 @@ class ScoreNetwork(torch.nn.Module):
         self.net = MLP(2 * t_enc_dim,
                        layer_widths=decoder_layers + [input_dim],
                        activate_final=False,
-                       activation_fn=torch.nn.Softplus())
+                       activation_fn=torch.nn.Softplus(),
+                       final_zero=True)
 
         self.t_encoder = MLP(pos_dim,
                              layer_widths=encoder_layers + [t_enc_dim],
-                             activate_final=False,
+                             activate_final=True,
                              activation_fn=torch.nn.Softplus())
 
         self.x_encoder = MLP(input_dim,
                              layer_widths=encoder_layers + [t_enc_dim],
-                             activate_final=False,
+                             activate_final=True,
                              activation_fn=torch.nn.Softplus())
 
     def forward(self, x, t):
@@ -136,7 +140,7 @@ class ScoreNetwork(torch.nn.Module):
 
 
 class MLP(torch.nn.Module):
-    def __init__(self, input_dim, layer_widths, activate_final=False, activation_fn=F.relu):
+    def __init__(self, input_dim, layer_widths, activate_final=False, activation_fn=F.relu, final_zero=False):
         super(MLP, self).__init__()
         layers = []
         prev_width = input_dim
@@ -147,6 +151,9 @@ class MLP(torch.nn.Module):
             prev_width = layer_width
         self.input_dim = input_dim
         self.layer_widths = layer_widths
+        if final_zero:
+            layers[-1].weight.data.fill_(0.0)
+            layers[-1].bias.data.fill_(0.0)
         self.layers = torch.nn.ModuleList(layers)
         self.activate_final = activate_final
         self.activation_fn = activation_fn
