@@ -85,8 +85,8 @@ class ResNetScoreNetwork(AbstractDrift):
         self.final_block = torch.nn.Sequential(torch.nn.Linear(self.temb_dim * 2 + initial_dim, input_dim))
         
         # initialising at Brownian motion
-        self.final_block[-1].weight.data.fill_(0.0)
-        self.final_block[-1].bias.data.fill_(0.0)
+#         self.final_block[-1].weight.data.fill_(0.0)
+#         self.final_block[-1].bias.data.fill_(0.0)
 
     def forward(self, x, t):
         # t needs the same shape as x (except for the final dim, which is 1)
@@ -130,8 +130,8 @@ class ResNetScoreNetworkLarge(AbstractDrift):
         # Final_block
         self.final_block = torch.nn.Sequential(torch.nn.Linear(self.temb_dim * 2 + initial_dim, input_dim))
 
-        self.final_block[-1].weight.data.fill_(0.0)
-        self.final_block[-1].bias.data.fill_(0.0)
+#         self.final_block[-1].weight.data.fill_(0.0)
+#         self.final_block[-1].bias.data.fill_(0.0)
 
     def forward(self, x, t):
         # t needs the same shape as x (except for the final dim, which is 1)
