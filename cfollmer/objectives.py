@@ -84,14 +84,18 @@ def vargrad_control_cost(
     """
     TODO : Test and double check for errors
     
-    Note this is implemented in the most naive way following Eq  in Nüsken and Ritchter
+    Note this is implemented in the most naive way following  Eq 49 (prop 3.10) in Nüsken and Ritchter
     a more efficient implementation would augment the state-space as we disccused
     just currently racing through this. 
     
+    paper : https://arxiv.org/pdf/2005.05409.pdf
+
     Objective for the VarGrad (Nüsken et al. 2020) Hamilton-Bellman-Jacobi Follmer Sampler
     """
+    
+    with torch.no_grad():
 
-    param_trajectory, ts = sde.sample_trajectory(param_batch_size, dt=dt, device=device)
+        param_trajectory, ts = sde.sample_trajectory(param_batch_size, dt=dt, device=device)
     
     param_trajectory = param_trajectory.detach()
     param_T = param_trajectory[-1]
@@ -101,8 +105,8 @@ def vargrad_control_cost(
     # Could adjust torchsde to return the drift as an extra parameter (seems that there's
     # no way currently)
     us = vmap(sde.f)(ts, param_trajectory)
-    f_detached = lambda ts, xs: sde.f(ts, xs, detach=True)
-    us_detached = vmap(f_detached)(ts, param_trajectory)
+    # f_detached = lambda ts, xs: sde.f(ts, xs, detach=True)
+    us_detached = us.detach()
     
     # dW samples for Ito integral
     dW = torch.normal(mean=0.0, std=math.sqrt(dt), size=us_detached.shape).to(device)
