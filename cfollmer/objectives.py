@@ -59,16 +59,17 @@ def stl_control_cost(
     # Note: this is essentially evaluated twice (once before in sdeint call).
     # Could adjust torchsde to return the drift as an extra parameter (seems that there's
     # no way currently)
-    us = vmap(sde.f)(ts, param_trajectory)
+    us = vmap(sde.f)(ts, param_trajectory)[:-1, ...]
     f_detached = lambda ts, xs: sde.f(ts, xs, detach=True)
-    us_detached = vmap(f_detached)(ts, param_trajectory)
-    
-    # dW samples for Ito integral
-    dW = torch.normal(mean=0.0, std=math.sqrt(dt), size=us_detached.shape).to(device)
+    us_detached = vmap(f_detached)(ts, param_trajectory)[:-1, ...]
+
+    with torch.no_grad():
+        dX = param_trajectory[1:, ...]- param_trajectory[:-1, ...]
+        dW_div_sqrt_gamma = dX - us_detached * dt
 
     # Costs
     energy_cost = torch.sum(us**2, dim=[0, 2]) * dt  / (2 * sde.gamma)
-    ito_cost = (torch.einsum("ijk,ijk->ij", us_detached / sde.gamma, dW)).sum(axis=0)#.mean() # batched dot products
+    ito_cost = (torch.einsum("ijk,ijk->ij", us_detached, dW_div_sqrt_gamma)).sum(axis=0)#.mean() # batched dot products
     terminal_cost = - torch.sum(param_T**2, dim=1) / (2 * sde.gamma) - log_p(param_T)
 
     return torch.mean(energy_cost + ito_cost + terminal_cost)
