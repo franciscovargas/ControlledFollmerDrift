@@ -63,10 +63,7 @@ class FollmerSDE_STL(torch.nn.Module):
         # [batch_size, 1]
         kl_row = (f**2).sum(dim=-1) / (2 * self.gamma)
         
-        try:
-            return torch.cat((f, kl_row[...,None]), dim=1)
-        except:
-            import pdb;pdb.set_trace()
+        return torch.cat((f, kl_row[...,None]), dim=1)
 
     def g(self, t, y):
         batch_size, dim = y.shape 
@@ -89,4 +86,4 @@ class FollmerSDE_STL(torch.nn.Module):
         return param_trajectory, ts
 
     def sample(self, batch_size, dt=0.05, device=None):
-        return self.sample_trajectory(batch_size, dt=dt, device=device)[0][-1][:-1]
+        return self.sample_trajectory(batch_size, dt=dt, device=device)[0][-1][:,:-1]
