@@ -104,10 +104,8 @@ def stl_control_cost_aug(
     ito_cost = (torch.einsum("ijk,ijk->ij", us_detached[:,:,:-1], dW_div_sqrt_gamma)).sum(axis=0)
     
     
-    try:
-        terminal_cost = - torch.sum(param_T[..., :-1]**2, dim=1) / (2 * sde.gamma) - log_p(param_T[..., :-1])
-    except:
-        import pdb; pdb.set_trace()
+    terminal_cost = - torch.sum(param_T[..., :-1]**2, dim=1) / (2 * sde.gamma) - log_p(param_T[..., :-1])
+
 
     return torch.mean(energy_cost + ito_cost + terminal_cost)
 
