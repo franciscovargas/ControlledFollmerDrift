@@ -65,7 +65,7 @@ def stl_control_cost(
 
     with torch.no_grad():
         dX = param_trajectory[1:, ...]- param_trajectory[:-1, ...]
-        dW_div_sqrt_gamma = dX - us_detached
+        dW_div_sqrt_gamma = dX - us_detached * dt
 
     # Costs
     energy_cost = torch.sum(us**2, dim=[0, 2]) * dt  / (2 * sde.gamma)
