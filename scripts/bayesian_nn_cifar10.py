@@ -12,33 +12,33 @@ from torchvision.transforms import ToTensor
 from tqdm import tqdm
 
 import cfollmer.functional as functional
-from cfollmer.drifts import ResNetScoreNetwork
+from cfollmer.drifts import SimpleForwardNetBN, ResNetScoreNetwork
 from cfollmer.evaluation_utils import ECE
-from cfollmer.objectives import relative_entropy_control_cost, stl_control_cost_aug
+from cfollmer.objectives import relative_entropy_control_cost, stl_control_cost, stl_control_cost_aug
 from cfollmer.sampler_utils import FollmerSDE, FollmerSDE_STL
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
-class LeNet5(torch.nn.Module):
+class LeNet5Cifar10(torch.nn.Module):
 
     def __init__(self, n_classes):
-        super(LeNet5, self).__init__()
+        super(LeNet5Cifar10, self).__init__()
 
         self.feature_extractor = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=1, out_channels=6, kernel_size=5, stride=1),
-            torch.nn.Tanh(),
-            torch.nn.AvgPool2d(kernel_size=2),
-            torch.nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5, stride=1),
-            torch.nn.Tanh(),
-            torch.nn.AvgPool2d(kernel_size=2),
+            torch.nn.Conv2d(in_channels=3, out_channels=6, kernel_size=5),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(kernel_size=2),
+            torch.nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(kernel_size=2),
         )
 
         self.classifier = torch.nn.Sequential(
-            torch.nn.Linear(in_features=256, out_features=120),
-            torch.nn.Tanh(),
+            torch.nn.Linear(in_features=16 * 5 * 5, out_features=120),
+            torch.nn.ReLU(),
             torch.nn.Linear(in_features=120, out_features=84),
-            torch.nn.Tanh(),
+            torch.nn.ReLU(),
             torch.nn.Linear(in_features=84, out_features=n_classes),
         )
 
@@ -49,16 +49,18 @@ class LeNet5(torch.nn.Module):
         return logits
 
 
-test_transforms = transforms.Compose([transforms.ToTensor(), transforms.RandomAffine(30)])
+transform = transforms.Compose(
+    [ToTensor(),
+     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+     ])
 
-MNIST_train = datasets.MNIST("data/mnist/", download=True, transform=ToTensor(), train=True)
-MNIST_test = datasets.MNIST("data/mnist/", download=True, transform=test_transforms, train=False)
-MNIST_test_unrotated = datasets.MNIST("data/mnist/", download=True, transform=ToTensor(), train=False)
+CIFAR10_train = datasets.CIFAR10("data/cifar10/", download=True, transform=transform, train=True)
+CIFAR10_test = datasets.CIFAR10("data/cifar10/", download=True, transform=transform, train=False)
 
-N_train = len(MNIST_train)
-N_test = len(MNIST_test)
+N_train = len(CIFAR10_train)
+N_test = len(CIFAR10_test)
 
-model = LeNet5(10).to(device)
+model = LeNet5Cifar10(10).to(device)
 func_model, params = functorch.make_functional(model)
 size_list = functional.params_to_size_tuples(params)
 dim = functional.get_number_of_params(size_list)
@@ -67,7 +69,7 @@ sigma2 = 1
 
 
 def log_prior(params):
-    return -torch.sum(params**2) / (2 * sigma2)
+    return -torch.sum(params ** 2) / (2 * sigma2)
 
 
 def log_likelihood(x, y, params):
@@ -93,14 +95,13 @@ def log_posterior_batch(x, y, params_batch):
 
 def train(gamma, n_epochs, data_batch_size, param_batch_size, dt=0.05, stl=False):
     if stl:
-        # sde = FollmerSDE_STL(gamma, SimpleForwardNetBN(input_dim=dim, width=300)).to(device)
-        sde = FollmerSDE_STL(gamma, ResNetScoreNetwork(input_dim=dim)).to(device)
+        # sde = FollmerSDE_STL(gamma, SimpleForwardNetBN(input_dim=dim, width=200)).to(device)
+        sde = FollmerSDE_STL(gamma, ResNetScoreNetwork(input_dim=dim, final_zero=True)).to(device)
     else:
-        # sde = FollmerSDE(gamma, SimpleForwardNetBN(input_dim=dim, width=300)).to(device)
-        sde = FollmerSDE(gamma, ResNetScoreNetwork(input_dim=dim)).to(device)
+        sde = FollmerSDE(gamma, ResNetScoreNetwork(input_dim=dim, final_zero=True)).to(device)
     optimizer = torch.optim.Adam(sde.parameters(), lr=1e-5)
 
-    dataloader_train = DataLoader(MNIST_train, shuffle=True, batch_size=data_batch_size, num_workers=2)
+    dataloader_train = DataLoader(CIFAR10_train, shuffle=True, batch_size=data_batch_size, num_workers=2)
 
     losses = []
 
@@ -137,34 +138,9 @@ def train(gamma, n_epochs, data_batch_size, param_batch_size, dt=0.05, stl=False
     return sde, losses
 
 
-gamma = 0.2 ** 2
-# gamma = 1**2
-n_epochs = 10
-data_batch_size = 32
-param_batch_size = 32
-
-num_exp = 5
-
-weights_path = "weights/bnn_mnist/"
-results_path = "results/bnn_mnist/"
-if not os.path.exists(weights_path):
-    os.makedirs(weights_path)
-if not os.path.exists(results_path):
-    os.makedirs(results_path)
-
-for i in range(num_exp):
-    sde, losses = train(gamma, n_epochs, data_batch_size, param_batch_size, dt=0.05, stl=True)
-    torch.save(sde.state_dict(), f"{weights_path}weights-vargrad-sigma1-{i}.pt")
-    del sde
-    gc.collect()
-    torch.cuda.empty_cache()
-
-
-def evaluate(param_samples, rotated=True):
-    if rotated:
-        dataloader_test = DataLoader(MNIST_test, shuffle=False, batch_size=data_batch_size, num_workers=2)
-    else:
-        dataloader_test = DataLoader(MNIST_test_unrotated, shuffle=False, batch_size=data_batch_size, num_workers=2)
+def evaluate(param_samples):
+    dataloader_test = DataLoader(CIFAR10_test, shuffle=False, batch_size=data_batch_size, num_workers=2)
+    # dataloader_test = DataLoader(CIFAR10_train, shuffle=False, batch_size=data_batch_size, num_workers=2)
 
     all_predictions = []
     all_confidences = []
@@ -190,7 +166,8 @@ def evaluate(param_samples, rotated=True):
 
     all_predictions = torch.hstack(all_predictions).cpu().numpy()
     all_confidences = torch.hstack(all_confidences).cpu().numpy()
-    true_labels = MNIST_test.targets.numpy()
+    true_labels = np.array(CIFAR10_test.targets)
+    # true_labels = np.array(CIFAR10_train.targets)
 
     accuracy = np.mean(all_predictions == true_labels)
     ece = ECE(all_confidences, all_predictions, true_labels)
@@ -200,10 +177,38 @@ def evaluate(param_samples, rotated=True):
     return accuracy, ece, logp
 
 
+# gamma_sqrt = [1, 0.5, 0.1, 0.08, *0.05*, 0.01]
+gamma_sqrt = 0.05
+gamma = gamma_sqrt ** 2
+n_epochs = 10
+data_batch_size = 32
+param_batch_size = 32
+
+num_exp = 5
+
+weights_path = "weights/bnn_cifar10/resnet/"
+results_path = "results/bnn_cifar10/resnet/"
+if not os.path.exists(weights_path):
+    os.makedirs(weights_path)
+if not os.path.exists(results_path):
+    os.makedirs(results_path)
+
+for i in range(num_exp):
+    sde, losses = train(gamma, n_epochs, data_batch_size, param_batch_size, dt=0.05, stl=True)
+    torch.save(sde.state_dict(), f"{weights_path}weights-vargrad-sigma1-{i}.pt")
+    #     plt.figure(figsize=(15, 15))
+    #     plt.plot(losses[0])
+    #     plt.savefig(f"experiments/losses_{gamma_sqrt}_{i}.png")
+    #     plt.close()
+    del sde
+    gc.collect()
+    torch.cuda.empty_cache()
+
+
 accuracies, eces, logps = [], [], []
 
 for i in range(num_exp):
-    #     sde = FollmerSDE(gamma, SimpleForwardNetBN(input_dim=dim, width=300)).to(device)
+    # sde = FollmerSDE(gamma, SimpleForwardNetBN(input_dim=dim, width=200)).to(device)
     sde = FollmerSDE(gamma, ResNetScoreNetwork(dim)).to(device)
     sde.load_state_dict(torch.load(f"{weights_path}weights-vargrad-sigma1-{i}.pt"))
 
@@ -216,14 +221,6 @@ for i in range(num_exp):
     eces.append(ece)
     logps.append(logp)
 
-    del sde
-    del param_samples
-    del accuracy
-    del ece
-    del logp
-    gc.collect()
-    torch.cuda.empty_cache()
-
 accuracies = np.array(accuracies)
 eces = np.array(eces)
 logps = np.array(logps)
@@ -231,12 +228,12 @@ logps = np.array(logps)
 SBP_df = pd.DataFrame({"Accuracy": accuracies, "ECE": eces, "log predictive": logps})
 
 SBP_df.describe()
-with open(f"{results_path}/mnist_unrotated_cfollmer_vargrad.txt", 'w') as f:
+with open(f"{results_path}/cifar10_cfollmer_vargrad.txt", 'w') as f:
     f.write(str(SBP_df.describe()))
 print("FINISHED CFOLLMER")
 
 # SGLD
-
+"""
 @torch.enable_grad()
 def gradient(x, y, params):
     params_ = params.clone().requires_grad_(True)
@@ -246,12 +243,11 @@ def gradient(x, y, params):
 
 
 def step_size(n):
-    lr = 7e-5
-    return lr / (1 + n) ** 0.55
+    return 1e-4 / (1 + n) ** 0.55
 
 
 def sgld(n_epochs, data_batch_size):
-    dataloader_train = DataLoader(MNIST_train, shuffle=True, batch_size=data_batch_size, num_workers=4)
+    dataloader_train = DataLoader(CIFAR10_train, shuffle=True, batch_size=data_batch_size, num_workers=2)
     params = torch.cat([param.flatten() for param in model.parameters()]).detach()
     losses = []
     step = 0
@@ -289,43 +285,31 @@ def sgld(n_epochs, data_batch_size):
 
 
 accuracies, eces, logps = [], [], []
-accuracies_unrotated, eces_unrotated, logps_unrotated = [], [], []
 
 for i in range(num_exp):
     param_samples, losses = sgld(n_epochs, data_batch_size)
 
     accuracy, ece, logp = evaluate(param_samples)
-    accuracy_unrotated, ece_unrotated, logp_unrotated = evaluate(param_samples, False)
 
     accuracies.append(accuracy)
     eces.append(ece)
     logps.append(logp)
-    accuracies_unrotated.append(accuracy_unrotated)
-    eces_unrotated.append(ece_unrotated)
-    logps_unrotated.append(logp_unrotated)
 
 accuracies = np.array(accuracies)
 eces = np.array(eces)
 logps = np.array(logps)
-accuracies_unrotated = np.array(accuracies_unrotated)
-eces_unrotated = np.array(eces_unrotated)
-logps_unrotated = np.array(logps_unrotated)
 
 SGLD_df = pd.DataFrame({"Accuracy": accuracies, "ECE": eces, "log predictive": logps})
-with open(f"{results_path}mnist_rotated_sgld.txt", 'w') as f:
-    f.write(str(SGLD_df.describe()))
-SGLD_df = pd.DataFrame({"Accuracy": accuracies_unrotated, "ECE": eces_unrotated, "log predictive": logps_unrotated})
-with open(f"{results_path}mnist_unrotated_sgld.txt", 'w') as f:
+with open("experiments/bayesian_nn_cifar10_sgld.txt", 'w') as f:
     f.write(str(SGLD_df.describe()))
 print("FINISHED SGLD")
 
 
 # SGD
 def sgd(n_epochs, data_batch_size):
-    lr = 1e-1
-    dataloader_train = DataLoader(MNIST_train, shuffle=True, batch_size=data_batch_size, num_workers=2)
-    model = LeNet5(10).to(device)
-    optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+    dataloader_train = DataLoader(CIFAR10_train, shuffle=True, batch_size=data_batch_size, num_workers=2)
+    model = LeNet5Cifar10(10).to(device)
+    optimizer = torch.optim.SGD(model.parameters(), lr=1e-2)
     losses = []
 
     for i in range(n_epochs):
@@ -368,6 +352,8 @@ eces = np.array(eces)
 logps = np.array(logps)
 
 SGD_df = pd.DataFrame({"Accuracy": accuracies, "ECE": eces, "log predictive": logps})
-with open(f"{results_path}mnist_rotated_sgd.txt", 'w') as f:
+with open("experiments/bayesian_nn_cifar10_sgd.txt", 'w') as f:
     f.write(str(SGD_df.describe()))
 print("FINISHED SGD")
+
+"""
