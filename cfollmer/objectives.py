@@ -39,42 +39,6 @@ def relative_entropy_control_cost(
     return torch.mean(energy_cost + terminal_cost)
 
 
-def stl_control_cost(
-        sde: torch.nn.Module,
-        log_p: Callable,
-        param_batch_size: Optional[int] = 32,
-        dt: Optional[float] = 0.05,
-        device: Optional[torch.device] = None,
-    ):
-    """
-    TODO : seems to give reasonable results, incredibly slow
-    
-    Objective for the STL (Xu et al. 2021) Hamilton-Bellman-Jacobi Follmer Sampler
-    """
-
-    param_trajectory, ts = sde.sample_trajectory(param_batch_size, dt=dt, device=device)
-    param_T = param_trajectory[-1]
-
-    # Has shape [T, batch_size, dim]
-    # Note: this is essentially evaluated twice (once before in sdeint call).
-    # Could adjust torchsde to return the drift as an extra parameter (seems that there's
-    # no way currently)
-    us = vmap(sde.f)(ts, param_trajectory)[:-1, ...]
-    f_detached = lambda ts, xs: sde.f(ts, xs, detach=True)
-    us_detached = vmap(f_detached)(ts, param_trajectory)[:-1, ...]
-
-    with torch.no_grad():
-        dX = param_trajectory[1:, ...]- param_trajectory[:-1, ...]
-        dW_div_sqrt_gamma = (dX - us_detached * dt) / sde.gamma
-
-    # Costs
-    energy_cost = torch.sum(us**2, dim=[0, 2]) * dt  / (2 * sde.gamma)
-    ito_cost = (torch.einsum("ijk,ijk->ij", us_detached, dW_div_sqrt_gamma)).sum(axis=0)#.mean() # batched dot products
-    terminal_cost = - torch.sum(param_T**2, dim=1) / (2 * sde.gamma) - log_p(param_T)
-
-    return torch.mean(energy_cost + ito_cost + terminal_cost)
-
-
 def stl_control_cost_aug(
         sde: torch.nn.Module,
         log_p: Callable,
@@ -91,7 +55,6 @@ def stl_control_cost_aug(
     param_trajectory, ts = sde.sample_trajectory(param_batch_size, dt=dt, device=device)
     param_T = param_trajectory[-1]
     
-    
     f_detached = lambda ts, xs: sde.f(ts, xs, detach=True)
     us_detached = vmap(f_detached)(ts, param_trajectory)[:-1, ...]
     
@@ -101,11 +64,8 @@ def stl_control_cost_aug(
 
     # Costs
     energy_cost = param_T[..., -1]
-    ito_cost = (torch.einsum("ijk,ijk->ij", us_detached[:,:,:-1], dW_div_sqrt_gamma)).sum(axis=0)
-    
-    
+    ito_cost = (torch.einsum("ijk,ijk->ij", us_detached[:,:,:-1], dW_div_sqrt_gamma)).sum(axis=0)   
     terminal_cost = - torch.sum(param_T[..., :-1]**2, dim=1) / (2 * sde.gamma) - log_p(param_T[..., :-1])
-
 
     return torch.mean(energy_cost + ito_cost + terminal_cost)
 
