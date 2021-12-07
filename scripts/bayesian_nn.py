@@ -137,7 +137,7 @@ def train(gamma, n_epochs, data_batch_size, param_batch_size, dt=0.05, stl=False
     return sde, losses
 
 
-gamma = 0.2 ** 2
+gamma = 0.1 ** 2
 # gamma = 1**2
 n_epochs = 10
 data_batch_size = 32
