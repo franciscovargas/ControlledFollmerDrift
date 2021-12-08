@@ -19,4 +19,4 @@ $ pip install -e .
 * MNIST Feedfoward: https://github.com/franciscovargas/ControlledFollmerDrift/blob/main/scripts/bayesian_nn.py
 * MNIST ScoreNetwork: https://github.com/franciscovargas/ControlledFollmerDrift/blob/main/scripts/bayesian_nn_score_network.py
 * CIFAR 10 Feedforward:https://github.com/franciscovargas/ControlledFollmerDrift/blob/main/scripts/bayesian_nn_cifar10.py
-* Hyperspectral images: 
+* Hyperspectral images: https://github.com/franciscovargas/ControlledFollmerDrift/blob/hyperspectral-unmixing/notebooks/Hyperspectral%20Unmixing.ipynb
