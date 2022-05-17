@@ -13,7 +13,6 @@ class AbstractDrift(torch.nn.Module):
         x = torch.cat((x, t), dim=-1)
         return self.nn(x)
 
-
 class SimpleForwardNet(AbstractDrift):
 
     def __init__(self, input_dim=1, width=20):
