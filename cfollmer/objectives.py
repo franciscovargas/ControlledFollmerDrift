@@ -12,6 +12,14 @@ import numpy as np
 from functorch import vmap
 
 
+# def vmap(f):
+#     def map_(ts,param_trajectory):
+#         out = [None for i in range(len(ts))]
+#         for i in range(len(ts)):
+#             out[i] = f(t[i], param_trajectory[i])
+#         return torch.tensor(out)
+#     return map_
+
 def relative_entropy_control_cost(
         sde: torch.nn.Module,
         log_p: Callable,
@@ -104,7 +112,7 @@ def vargrad_control_cost(
     # Could adjust torchsde to return the drift as an extra parameter (seems that there's
     # no way currently)
     
-    us = vmap(sde.f)(ts, param_trajectory)
+    us = vmap(sde.f)(ts[:-1, ...], param_trajectory[:-1, ...])
 
     # Costs
     energy_cost = torch.sum(us**2, dim=[0, 2]) * dt  / (2 * sde.gamma)

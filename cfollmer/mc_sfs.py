@@ -13,9 +13,10 @@ import functorch
 
 class MCFollmerDrift:
     
-    def __init__(self, log_posterior, X,y, dim, device, n_samp=300, gamma=torch.tensor(1), debug=False):
+    def __init__(self, log_posterior, X,y, dim, device, n_samp=500, gamma=torch.tensor(1), debug=False, size_list=None):
         self.log_posterior = log_posterior
         self.debug = debug
+        self.size_list=size_list
         self.log_posterior = log_posterior
         self.device = device
         self.X = X
@@ -29,20 +30,22 @@ class MCFollmerDrift:
         )
         
     def g(self, thet):
-        func = lambda params: self.log_posterior(self.X, self.y, params)
+        func = lambda params: self.log_posterior(self.X, self.y, params, size_list=self.size_list)
         func = functorch.vmap(func)
         lp = func(thet)
         reg = 0.5 * (thet**2).sum(dim=-1) / self.gamma
         
+#             if torch.any(torch.isinf(torch.exp(lp + reg))):
 
         out = torch.exp(lp + reg)
         isnan = torch.isinf(torch.abs(out)) | torch.isnan(out)
         if self.debug and torch.any(isnan):
             import pdb; pdb.set_trace()
+#         import pdb; pdb.set_trace()
         return out # nans exp(reg)
 
     def ln_g(self, thet):
-        func = lambda params: self.log_posterior(self.X, self.y, params)
+        func = lambda params: self.log_posterior(self.X, self.y, params, size_list=self.size_list)
         func = functorch.vmap(func)
         lp = func(thet)
         reg = 0.5 * (thet**2).sum(dim=-1) / self.gamma
@@ -101,6 +104,7 @@ class MCFollmerDrift:
     def mc_follmer_drift_debug(self, t, params):
         # Using Stein Estimator for SFS drift
         
+        
         Z = self.distrib.rsample((self.n_samp,)).to(self.device)
         params = params[0]
 
@@ -130,16 +134,23 @@ class MCFollmerDrift:
 
 class MCFollmerSDE(torch.nn.Module):
 
-    def __init__(self, gamma, dim, log_posterior, X_train, y_train, device, debug=False):
+    def __init__(self, 
+                 gamma, dim, log_posterior, 
+                 X_train, y_train, device, debug=False, size_list=None,n_samp=None
+                ):
         super().__init__()
-
+        
+        self.n_samp = 500 if n_samp is None else n_samp
         self.noise_type = 'diagonal'
         self.sde_type = 'ito'
         self.gamma = gamma
+        self.size_list = size_list
         if debug:
-            self.drift =  MCFollmerDrift(log_posterior, X_train, y_train, dim, device, gamma=gamma, debug=debug).mc_follmer_drift_debug
+            self.drift =  MCFollmerDrift(log_posterior, X_train, y_train, dim, device, gamma=gamma, debug=debug, size_list=size_list).mc_follmer_drift_debug
         else:
-            self.drift =  MCFollmerDrift(log_posterior, X_train, y_train, dim, device, gamma=gamma).mc_follmer_drift
+            self.drift =  MCFollmerDrift(
+                log_posterior, X_train, y_train, dim, device, gamma=gamma, size_list=size_list, n_samp=self.n_samp
+            ).mc_follmer_drift
         self.dim = dim
         
     def f(self, t, y, detach=False):
@@ -161,7 +172,3 @@ class MCFollmerSDE(torch.nn.Module):
 
     def sample(self, batch_size, dt=0.05, device=None):
         return self.sample_trajectory(batch_size, dt=dt, device=device)[0] [-1]#[-1]
-    
-
-# mcfol = MCFollmerDrift(log_posterior, X_train, y_train, dim, device)
-# sde_sfs = MCFollmerSDE(torch.tensor(gamma), dim, log_posterior, X_train, y_train, device)
